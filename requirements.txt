@@ -6,3 +6,4 @@ langchain-chroma
 pypdf
 python-dotenv
 docx2txt==0.9
+protobuf==3.20.3
