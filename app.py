@@ -72,7 +72,8 @@ if st.session_state.document_processed:
         with st.spinner("AI sedang menyiapkan pertanyaan pertama..."):
             try:
                 first_q = chat_engine.generate_question(st.session_state.current_stage, [])
-                st.session_state.messages.append({"role": "assistant", "content": first_q})
+                nama_penguji = QUESTION_STAGES[st.session_state.current_stage]["nama_penguji"]
+                st.session_state.messages.append({"role": "assistant", "content": f"**[{nama_penguji}]**\n\n{first_q}"})
                 st.rerun()
             except Exception as e:
                 st.error(f"Error saat membuat pertanyaan: {str(e)}")
@@ -99,7 +100,8 @@ if st.session_state.document_processed:
                     with st.spinner("Menganalisis jawaban dan menyiapkan pertanyaan..."):
                         try:
                             next_q = chat_engine.generate_question(st.session_state.current_stage, st.session_state.messages)
-                            st.session_state.messages.append({"role": "assistant", "content": next_q})
+                            nama_penguji = QUESTION_STAGES[st.session_state.current_stage]["nama_penguji"]
+                            st.session_state.messages.append({"role": "assistant", "content": f"**[{nama_penguji}]**\n\n{next_q}"})
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error saat membuat pertanyaan: {str(e)}")
@@ -109,7 +111,7 @@ if st.session_state.document_processed:
                     with st.spinner("Menyusun laporan evaluasi..."):
                         try:
                             eval_report = chat_engine.generate_evaluation(st.session_state.messages)
-                            st.session_state.messages.append({"role": "assistant", "content": eval_report})
+                            st.session_state.messages.append({"role": "assistant", "content": f"**[Ketua Sidang / Pembimbing]**\n\n{eval_report}"})
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error saat menyusun evaluasi: {str(e)}")

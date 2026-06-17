@@ -23,7 +23,7 @@ class ChatEngine:
 
     def generate_question(self, current_stage_index: int, chat_history: list):
         """Menghasilkan pertanyaan berdasarkan RAG dan stage saat ini."""
-        fokus_pertanyaan = QUESTION_STAGES[current_stage_index]
+        stage_info = QUESTION_STAGES[current_stage_index]
         formatted_history = self.format_chat_history(chat_history)
         
         prompt = ChatPromptTemplate.from_template(EXAMINER_SYSTEM_PROMPT)
@@ -35,6 +35,9 @@ class ChatEngine:
         rag_chain = (
             {
                 "context": itemgetter("fokus_pertanyaan") | self.retriever | format_docs,
+                "nama_penguji": itemgetter("nama_penguji"),
+                "persona": itemgetter("persona"),
+                "tipe_pertanyaan": itemgetter("tipe_pertanyaan"),
                 "fokus_pertanyaan": itemgetter("fokus_pertanyaan"),
                 "chat_history": itemgetter("chat_history")
             }
@@ -43,10 +46,12 @@ class ChatEngine:
             | StrOutputParser()
         )
         
-        # Panggil LLM dengan fokus pertanyaan untuk memicu konteks retrieval dari ChromaDB
-        # Karena pertanyaan belum ada (AI yang proaktif bertanya), kita trigger retriever dengan fokus_pertanyaan
+        # Panggil LLM
         response = rag_chain.invoke({
-            "fokus_pertanyaan": fokus_pertanyaan,
+            "nama_penguji": stage_info["nama_penguji"],
+            "persona": stage_info["persona"],
+            "tipe_pertanyaan": stage_info["tipe"],
+            "fokus_pertanyaan": stage_info["fokus"],
             "chat_history": formatted_history
         })
         
