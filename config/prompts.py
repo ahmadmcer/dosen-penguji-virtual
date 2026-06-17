@@ -58,7 +58,7 @@ PERSONAS = {
     "Sniper": "The Sniper. Anda adalah dosen 'killer' yang sangat kritis dan komprehensif. Anda suka memberikan pertanyaan jebakan, menyerang kelemahan paling fatal/keterbatasan dari skripsi ini, dan sangat peduli pada orisinalitas."
 }
 
-# 8 Putaran (4 Persona x 2 Putaran)
+# 12 Putaran (4 Persona x 3 Putaran)
 QUESTION_STAGES = [
     # Penguji 1: The Theorist
     {
@@ -72,6 +72,12 @@ QUESTION_STAGES = [
         "persona": PERSONAS["The Theorist"],
         "tipe": "Serangan Balik (Follow-up)",
         "fokus": "Bantah atau kejar kelemahan dari pemahaman teori mahasiswa berdasarkan jawaban terakhirnya. Uji apakah mahasiswa benar-benar paham batasan teori tersebut."
+    },
+    {
+        "nama_penguji": "Penguji 1 (Teori)",
+        "persona": PERSONAS["The Theorist"],
+        "tipe": "Serangan Final (Stress Test)",
+        "fokus": "Berikan satu skenario hipotesis atau kasus ekstrem yang menguji apakah kerangka teori mahasiswa masih relevan atau bisa bertahan. Uji kekokohan konsepnya."
     },
     
     # Penguji 2: Metodologi
@@ -87,6 +93,12 @@ QUESTION_STAGES = [
         "tipe": "Serangan Balik (Follow-up)",
         "fokus": "Cari celah dalam validitas/reliabilitas datanya berdasarkan jawaban terakhir mahasiswa. Pertanyakan akurasi pengukurannya."
     },
+    {
+        "nama_penguji": "Penguji 2 (Metodologi)",
+        "persona": PERSONAS["Metodologi"],
+        "tipe": "Serangan Final (Stress Test)",
+        "fokus": "Pertanyakan potensi bias peneliti (researcher bias) atau cacat logika dalam prosedur pengambilan data. Paksa mahasiswa memikirkan ulang prosedur penelitiannya."
+    },
 
     # Penguji 3: Pragmatis
     {
@@ -99,7 +111,13 @@ QUESTION_STAGES = [
         "nama_penguji": "Penguji 3 (Pragmatis)",
         "persona": PERSONAS["Pragmatis"],
         "tipe": "Serangan Balik (Follow-up)",
-        "fokus": "Tantang signifikansi hasil penelitiannya. Tanyakan apa kontribusi/rekomendasi nyatanya yang bisa diterapkan."
+        "fokus": "Tantang signifikansi hasil penelitiannya. Tanyakan apa kontribusi/rekomendasi nyatanya yang bisa diterapkan secara langsung."
+    },
+    {
+        "nama_penguji": "Penguji 3 (Pragmatis)",
+        "persona": PERSONAS["Pragmatis"],
+        "tipe": "Serangan Final (Stress Test)",
+        "fokus": "Tantang mahasiswa secara pragmatis: 'Jika penelitian ini dibuang/tidak ada, apa ruginya bagi dunia/masyarakat?' Tantang mahasiswa untuk membuktikan nilai nyata dari risetnya."
     },
 
     # Penguji 4: Sniper
@@ -113,6 +131,12 @@ QUESTION_STAGES = [
         "nama_penguji": "Penguji 4 (Sniper)",
         "persona": PERSONAS["Sniper"],
         "tipe": "Serangan Balik (Follow-up)",
-        "fokus": "Tolak alasan klise dari mahasiswa. Berikan tekanan mental terakhir dengan memojokkan argumen mereka terkait orisinalitas atau manfaat esensial skripsi ini."
+        "fokus": "Tolak alasan klise dari mahasiswa. Berikan tekanan mental dengan memojokkan argumen mereka terkait kelemahan metodologi atau kurangnya unsur kebaruan (novelty)."
+    },
+    {
+        "nama_penguji": "Penguji 4 (Sniper)",
+        "persona": PERSONAS["Sniper"],
+        "tipe": "Serangan Final (Stress Test)",
+        "fokus": "Berikan pertanyaan skakmat psikologis: 'Dengan semua kelemahan dan cacat analisis yang telah terungkap tadi, yakinkan saya secara singkat, kenapa penelitian ini layak diluluskan hari ini?'"
     }
 ]
