@@ -17,10 +17,22 @@ class RAGEngine:
     def ingest_document(self, uploaded_file, progress_callback=None):
         """Mengekstrak teks dari file PDF atau DOCX yang diupload."""
         file_extension = os.path.splitext(uploaded_file.name)[1].lower()
+        file_content = uploaded_file.getvalue()
+        
+        # Hitung MD5 Hash untuk Caching
+        import hashlib
+        file_hash = hashlib.md5(file_content).hexdigest()
+        db_path = f"./chroma_db/{file_hash}"
+        
+        # Cek jika cache database sudah ada
+        if os.path.exists(db_path):
+            print(f"Loading from cache: {db_path}")
+            self.vectorstore = Chroma(persist_directory=db_path, embedding_function=self.embeddings)
+            return True, True # Beri sinyal is_cached = True
         
         # Simpan file sementara
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
-            tmp_file.write(uploaded_file.getvalue())
+            tmp_file.write(file_content)
             tmp_path = tmp_file.name
 
         try:
@@ -38,8 +50,8 @@ class RAGEngine:
             splits = text_splitter.split_documents(pages)
             
             import time
-            # Membuat in-memory vectorstore secara bertahap dengan mekanisme Retry otomatis
-            self.vectorstore = Chroma(embedding_function=self.embeddings)
+            # Membuat vectorstore dengan persist_directory
+            self.vectorstore = Chroma(embedding_function=self.embeddings, persist_directory=db_path)
             batch_size = 5
             total_splits = len(splits)
             for i in range(0, total_splits, batch_size):
@@ -72,10 +84,10 @@ class RAGEngine:
                         else:
                             raise e
                     
-            return True
+            return True, False # is_cached = False
         except Exception as e:
             print(f"Error saat ingest dokumen: {e}")
-            return False
+            return False, False
         finally:
             # Hapus file sementara
             if os.path.exists(tmp_path):

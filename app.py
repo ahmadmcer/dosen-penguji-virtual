@@ -41,7 +41,7 @@ with st.sidebar:
                         pct = int((current / total) * 100) if total > 0 else 0
                         progress_bar.progress(min(current / total, 1.0), text=f"Memproses {current} dari {total} bagian ({pct}%)")
                         
-                    success = rag.ingest_document(uploaded_file, progress_callback=update_progress)
+                    success, is_cached = rag.ingest_document(uploaded_file, progress_callback=update_progress)
                     if success:
                         progress_bar.empty()
                         st.session_state.rag_engine = rag
@@ -49,7 +49,11 @@ with st.sidebar:
                         st.session_state.messages = [] # Reset chat
                         st.session_state.current_stage = 0
                         st.session_state.is_finished = False
-                        st.success("Dokumen siap! Simulasi dimulai.")
+                        
+                        if is_cached:
+                            st.success("⚡ Dokumen dimuat secara instan dari memori cache! Simulasi dimulai.")
+                        else:
+                            st.success("Dokumen siap! Simulasi dimulai.")
                         st.rerun()
                     else:
                         st.error("Gagal memproses dokumen.")
