@@ -1,0 +1,80 @@
+import os
+import time
+from langchain_community.document_loaders import PyPDFLoader
+import tempfile
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_chroma import Chroma
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+class RAGEngine:
+    def __init__(self):
+        # Inisialisasi model embedding
+        if not os.environ.get("GEMINI_API_KEY"):
+            raise ValueError("GEMINI_API_KEY belum dikonfigurasi di file .env")
+        self.embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2")
+        self.vectorstore = None
+
+    def ingest_pdf(self, uploaded_file, progress_callback=None):
+        """Mengekstrak teks dari file PDF yang diupload (Streamlit UploadedFile)."""
+        # Simpan file sementara untuk diproses PyPDFLoader
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            tmp_path = tmp_file.name
+
+        try:
+            loader = PyPDFLoader(tmp_path)
+            pages = loader.load()
+            
+            # Memecah dokumen dengan chunk_size besar agar jumlah request jauh lebih sedikit
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=6000, chunk_overlap=500)
+            splits = text_splitter.split_documents(pages)
+            
+            import time
+            # Membuat in-memory vectorstore secara bertahap dengan mekanisme Retry otomatis
+            self.vectorstore = Chroma(embedding_function=self.embeddings)
+            batch_size = 5
+            total_splits = len(splits)
+            for i in range(0, total_splits, batch_size):
+                if progress_callback:
+                    progress_callback(i, total_splits)
+                
+                batch = splits[i:i+batch_size]
+                success = False
+                retries = 0
+                while not success and retries < 10:
+                    try:
+                        self.vectorstore.add_documents(batch)
+                        success = True
+                        
+                        if progress_callback:
+                            progress_callback(min(i + batch_size, total_splits), total_splits)
+                            
+                        # Jeda 5.5 detik per 5 dokumen memastikan kita hanya mengirim ~54 request per menit
+                        # (Mencegah terbentur strict limit 60 RPM dari GCP)
+                        if i + batch_size < total_splits:
+                            time.sleep(5.5)
+                    except Exception as e:
+                        error_msg = str(e)
+                        # Retry jika terkena limit atau masalah koneksi server (503/502/504)
+                        retry_keywords = ["429", "RESOURCE_EXHAUSTED", "Quota exceeded", "503", "UNAVAILABLE", "502", "504", "connection"]
+                        if any(keyword in error_msg for keyword in retry_keywords):
+                            retries += 1
+                            print(f"Hit network/API limit. Retrying batch {i} in {5 * retries} seconds...")
+                            time.sleep(5 * retries) # Jeda makin lama jika terus diblokir
+                        else:
+                            raise e
+                    
+            return True
+        except Exception as e:
+            print(f"Error saat ingest PDF: {e}")
+            return False
+        finally:
+            # Hapus file sementara
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+                
+    def get_retriever(self):
+        """Mengembalikan retriever object untuk LangChain."""
+        if self.vectorstore is None:
+            return None
+        return self.vectorstore.as_retriever(search_kwargs={"k": 3})
