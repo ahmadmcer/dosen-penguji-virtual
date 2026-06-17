@@ -28,7 +28,7 @@ if "rag_engine" not in st.session_state:
 # Sidebar
 with st.sidebar:
     st.header("📄 Unggah Skripsi")
-    uploaded_file = st.file_uploader("Pilih file PDF Skripsi", type="pdf")
+    uploaded_file = st.file_uploader("Pilih file Skripsi (PDF/DOCX)", type=["pdf", "docx"])
     
     if st.button("Mulai Pemrosesan"):
         if uploaded_file is not None:
@@ -41,7 +41,7 @@ with st.sidebar:
                         pct = int((current / total) * 100) if total > 0 else 0
                         progress_bar.progress(min(current / total, 1.0), text=f"Memproses {current} dari {total} bagian ({pct}%)")
                         
-                    success = rag.ingest_pdf(uploaded_file, progress_callback=update_progress)
+                    success = rag.ingest_document(uploaded_file, progress_callback=update_progress)
                     if success:
                         progress_bar.empty()
                         st.session_state.rag_engine = rag
@@ -52,11 +52,11 @@ with st.sidebar:
                         st.success("Dokumen siap! Simulasi dimulai.")
                         st.rerun()
                     else:
-                        st.error("Gagal memproses PDF.")
+                        st.error("Gagal memproses dokumen.")
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
         else:
-            st.warning("Silakan unggah PDF terlebih dahulu.")
+            st.warning("Silakan unggah dokumen PDF atau DOCX terlebih dahulu.")
 
 # Main area chat
 if st.session_state.document_processed:
@@ -119,4 +119,4 @@ if st.session_state.document_processed:
     else:
         st.info("Simulasi sidang telah selesai. Anda dapat me-refresh halaman atau mengunggah dokumen baru untuk mengulang.")
 else:
-    st.info("Silakan unggah dokumen PDF di sidebar sebelah kiri dan klik 'Mulai Pemrosesan'.")
+    st.info("Silakan unggah dokumen PDF atau DOCX di sidebar sebelah kiri dan klik 'Mulai Pemrosesan'.")

@@ -1,6 +1,6 @@
 import os
 import time
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 import tempfile
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
@@ -14,15 +14,23 @@ class RAGEngine:
         self.embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2")
         self.vectorstore = None
 
-    def ingest_pdf(self, uploaded_file, progress_callback=None):
-        """Mengekstrak teks dari file PDF yang diupload (Streamlit UploadedFile)."""
-        # Simpan file sementara untuk diproses PyPDFLoader
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+    def ingest_document(self, uploaded_file, progress_callback=None):
+        """Mengekstrak teks dari file PDF atau DOCX yang diupload."""
+        file_extension = os.path.splitext(uploaded_file.name)[1].lower()
+        
+        # Simpan file sementara
+        with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as tmp_file:
             tmp_file.write(uploaded_file.getvalue())
             tmp_path = tmp_file.name
 
         try:
-            loader = PyPDFLoader(tmp_path)
+            if file_extension == ".pdf":
+                loader = PyPDFLoader(tmp_path)
+            elif file_extension == ".docx":
+                loader = Docx2txtLoader(tmp_path)
+            else:
+                raise ValueError(f"Format file {file_extension} tidak didukung.")
+                
             pages = loader.load()
             
             # Memecah dokumen dengan chunk_size besar agar jumlah request jauh lebih sedikit
@@ -66,7 +74,7 @@ class RAGEngine:
                     
             return True
         except Exception as e:
-            print(f"Error saat ingest PDF: {e}")
+            print(f"Error saat ingest dokumen: {e}")
             return False
         finally:
             # Hapus file sementara
