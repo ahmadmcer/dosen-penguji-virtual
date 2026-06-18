@@ -14,7 +14,11 @@ class ChatEngine:
     def format_chat_history(self, messages):
         """Memformat riwayat obrolan dari Streamlit format ke string sederhana."""
         formatted = ""
-        for msg in messages:
+        # Jendela Memori: Hanya ambil 12 pesan terakhir (6 giliran interaksi) 
+        # untuk mencegah kelebihan token (Token Bloat) dan mempercepat respons AI.
+        recent_messages = messages[-12:] if len(messages) > 12 else messages
+        
+        for msg in recent_messages:
             role = "Mahasiswa" if msg["role"] == "user" else "Penguji"
             # Bersihkan tanda baca [SELESAI] dari history jika ada secara tak terduga
             clean_content = msg['content'].replace("[SELESAI]", "")
@@ -34,10 +38,25 @@ class ChatEngine:
         # Jika belum ada percakapan (pertanyaan pertama), cari kata kunci umum skripsi
         search_query = "Latar belakang, rumusan masalah, metodologi penelitian, dan kesimpulan utama"
         if len(chat_history) > 0:
+            last_user_msg = ""
+            last_ai_msg = ""
+            # Cari pesan terakhir user dan AI
             for msg in reversed(chat_history):
-                if msg["role"] == "user":
-                    search_query = msg["content"]
+                if msg["role"] == "user" and not last_user_msg:
+                    last_user_msg = msg["content"]
+                elif msg["role"] == "assistant" and not last_ai_msg:
+                    # Ambil murni pertanyaan AI saja
+                    last_ai_msg = msg["content"].replace("**[Panel Penguji]**\n\n", "")
+                if last_user_msg and last_ai_msg:
                     break
+            
+            if last_user_msg:
+                # Pencarian Cerdas (Smart Fallback): Jika jawaban mahasiswa sangat pendek (< 10 kata),
+                # gabungkan pertanyaan AI sebelumnya dengan jawaban mahasiswa untuk RAG query
+                if len(last_user_msg.split()) < 10 and last_ai_msg:
+                    search_query = f"Pertanyaan: {last_ai_msg}\nJawaban: {last_user_msg}"
+                else:
+                    search_query = last_user_msg
 
         # Tarik dokumen relevan dari ChromaDB
         docs = self.retriever.invoke(search_query)
