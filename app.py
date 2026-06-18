@@ -46,6 +46,10 @@ with st.sidebar:
                         st.session_state.messages = [] # Reset chat
                         st.session_state.is_finished = False
                         
+                        # Bersihkan engine lama jika pengguna mengunggah dokumen baru
+                        if "chat_engine" in st.session_state:
+                            del st.session_state.chat_engine
+                        
                         if is_cached:
                             st.success("⚡ Dokumen dimuat secara instan dari memori cache! Simulasi dimulai.")
                         else:
@@ -67,12 +71,15 @@ with st.sidebar:
 
 # Main area chat
 if st.session_state.document_processed:
-    # Init ChatEngine
-    try:
-        chat_engine = ChatEngine(st.session_state.rag_engine.get_retriever())
-    except Exception as e:
-        st.error(f"Gagal menginisialisasi engine LLM: {str(e)}")
-        st.stop()
+    # Menggunakan pola Singleton: Mencegah instansiasi klien LLM Google berulang kali pada tiap refresh UI
+    if "chat_engine" not in st.session_state:
+        try:
+            st.session_state.chat_engine = ChatEngine(st.session_state.rag_engine.get_retriever())
+        except Exception as e:
+            st.error(f"Gagal menginisialisasi engine LLM: {str(e)}")
+            st.stop()
+            
+    chat_engine = st.session_state.chat_engine
     
     # Generate pertanyaan pertama jika kosong
     if len(st.session_state.messages) == 0 and not st.session_state.is_finished:

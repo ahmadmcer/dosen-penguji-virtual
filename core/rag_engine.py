@@ -98,6 +98,10 @@ class RAGEngine:
             return True, False # is_cached = False
         except Exception as e:
             print(f"Error saat ingest dokumen: {e}")
+            # Lakukan ROLLBACK: Bersihkan folder yang setengah jadi agar tidak menyebabkan duplikasi vektor
+            import shutil
+            if os.path.exists(db_path):
+                shutil.rmtree(db_path, ignore_errors=True)
             return False, False
         finally:
             # Hapus file sementara
