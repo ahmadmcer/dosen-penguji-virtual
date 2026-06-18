@@ -128,6 +128,10 @@ if st.session_state.document_processed:
                                 st.rerun()
                         except Exception as e:
                             st.error(f"Error saat membuat pertanyaan: {str(e)}")
+                            # ROLLBACK: Jika AI gagal merespons (misal API timeout), hapus pesan user terakhir
+                            # Ini wajib dilakukan agar UI tidak mengalami 'Soft-Lock' (kehilangan kotak input)
+                            if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "user":
+                                st.session_state.messages.pop()
 
     else:
         # Jika ditekan paksa (AI belum finish, tapi evaluate belum digenerate)
