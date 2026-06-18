@@ -108,25 +108,26 @@ if st.session_state.document_processed:
                 with st.chat_message("user"):
                     st.markdown(prompt)
             
-            with st.chat_message("assistant"):
-                with st.spinner("Dosen menelaah jawaban Anda..."):
-                    try:
-                        next_q, ai_finished = chat_engine.generate_question(st.session_state.messages)
-                        
-                        # Tambahkan ke UI
-                        st.session_state.messages.append({"role": "assistant", "content": f"**[Panel Penguji]**\n\n{next_q}"})
-                        
-                        if ai_finished:
-                            st.session_state.is_finished = True
-                            st.info("Panel Penguji telah menyudahi sesi tanya jawab. Sedang merumuskan evaluasi...")
-                            # Generate Evaluasi seketika
-                            eval_report = chat_engine.generate_evaluation(st.session_state.messages)
-                            st.session_state.messages.append({"role": "assistant", "content": f"**[Ketua Sidang / Evaluasi Akhir]**\n\n{eval_report}"})
-                            st.rerun()
-                        else:
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"Error saat membuat pertanyaan: {str(e)}")
+                # Blok AI generate harus berada DI DALAM blok "if prompt:" agar AI hanya menjawab setelah user mengetik
+                with st.chat_message("assistant"):
+                    with st.spinner("Dosen menelaah jawaban Anda..."):
+                        try:
+                            next_q, ai_finished = chat_engine.generate_question(st.session_state.messages)
+                            
+                            # Tambahkan ke UI
+                            st.session_state.messages.append({"role": "assistant", "content": f"**[Panel Penguji]**\n\n{next_q}"})
+                            
+                            if ai_finished:
+                                st.session_state.is_finished = True
+                                st.info("Panel Penguji telah menyudahi sesi tanya jawab. Sedang merumuskan evaluasi...")
+                                # Generate Evaluasi seketika
+                                eval_report = chat_engine.generate_evaluation(st.session_state.messages)
+                                st.session_state.messages.append({"role": "assistant", "content": f"**[Ketua Sidang / Evaluasi Akhir]**\n\n{eval_report}"})
+                                st.rerun()
+                            else:
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error saat membuat pertanyaan: {str(e)}")
 
     else:
         # Jika ditekan paksa (AI belum finish, tapi evaluate belum digenerate)
