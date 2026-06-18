@@ -65,9 +65,24 @@ class ChatEngine:
         
         # Panggil LLM
         chain = prompt | self.llm | StrOutputParser()
+        # Injeksi Constraint-Aware Pacing (Indikator Putaran Sidang)
+        # Menghitung jumlah putaran (1 Q&A = 1 putaran, maka len/2)
+        current_turn = (len(chat_history) // 2) + 1
+        max_turns = 10
+        
+        pacing_instruction = f"\n\n[INFO SISTEM]: Saat ini Anda berada pada putaran pertanyaan ke-{current_turn} dari maksimal {max_turns} putaran sidang.\n"
+        
+        if current_turn < max_turns - 2:
+            pacing_instruction += "INSTRUKSI: Fokuslah menggali satu topik spesifik (teori/metode/hasil) secara mendalam dan tajam."
+        elif current_turn < max_turns:
+            pacing_instruction += "INSTRUKSI: Waktu sidang segera habis! Segera beralih ke celah kelemahan fatal atau poin krusial lain yang belum sempat Anda tanyakan."
+        else:
+            pacing_instruction += "INSTRUKSI DARURAT: INI ADALAH GILIRAN TERAKHIR ANDA! Rumuskan satu pertanyaan pamungkas yang sangat komprehensif untuk merangkum seluruh keraguan Anda yang tersisa. Anda WAJIB mengakhiri kalimat penutup Anda dengan kode `[SELESAI]`."
+            
+        # Panggil LLM dengan konteks, riwayat obrolan, dan suntikan pacing kesadaran waktu
         response = chain.invoke({
             "context": context_str,
-            "chat_history": formatted_history
+            "chat_history": formatted_history + pacing_instruction
         })
         
         # Bersihkan format blok kode yang tidak disengaja dari AI
