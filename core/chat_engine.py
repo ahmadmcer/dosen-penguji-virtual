@@ -11,17 +11,18 @@ class ChatEngine:
         # Inisialisasi LLM
         self.llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash", temperature=0.3)
             
-    def format_chat_history(self, messages):
+    def format_chat_history(self, messages, limit_memory=True):
         """Memformat riwayat obrolan dari Streamlit format ke string sederhana."""
         formatted = ""
         # Jendela Memori: Hanya ambil 12 pesan terakhir (6 giliran interaksi) 
         # untuk mencegah kelebihan token (Token Bloat) dan mempercepat respons AI.
-        recent_messages = messages[-12:] if len(messages) > 12 else messages
+        recent_messages = messages[-12:] if (limit_memory and len(messages) > 12) else messages
         
+        import re
         for msg in recent_messages:
             role = "Mahasiswa" if msg["role"] == "user" else "Penguji"
-            # Bersihkan tanda baca [SELESAI] dari history jika ada secara tak terduga
-            clean_content = msg['content'].replace("[SELESAI]", "")
+            # Menggunakan regex untuk membersihkan [SELESAI] beserta bintang (**) dan titik
+            clean_content = re.sub(r"\**\[SELESAI\]\**\.?", "", msg['content']).strip()
             formatted += f"{role}: {clean_content}\n\n"
         return formatted
 
@@ -74,16 +75,18 @@ class ChatEngine:
         response = "\n".join(line.lstrip() if line.startswith("    ") or line.startswith("\t") else line for line in response.split("\n"))
         
         # Deteksi apakah AI mengeluarkan bendera SELESAI
+        import re
         is_finished = False
         if "[SELESAI]" in response:
             is_finished = True
-            response = response.replace("[SELESAI]", "").strip()
+            response = re.sub(r"\**\[SELESAI\]\**\.?", "", response).strip()
             
         return response, is_finished
         
     def generate_evaluation(self, chat_history: list):
         """Menghasilkan laporan evaluasi akhir."""
-        formatted_history = self.format_chat_history(chat_history)
+        # BUG FIXED: Jangan limit memory saat merumuskan evaluasi akhir agar nilainya adil!
+        formatted_history = self.format_chat_history(chat_history, limit_memory=False)
         prompt = ChatPromptTemplate.from_template(EVALUATOR_SYSTEM_PROMPT)
         
         chain = prompt | self.llm | StrOutputParser()

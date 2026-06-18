@@ -45,8 +45,8 @@ class RAGEngine:
                 
             pages = loader.load()
             
-            # Memecah dokumen dengan chunk_size besar agar jumlah request jauh lebih sedikit
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=6000, chunk_overlap=500)
+            # Memecah dokumen dengan chunk_size menengah agar pencarian semantik lebih tajam (akurat)
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=300)
             splits = text_splitter.split_documents(pages)
             
             import time
