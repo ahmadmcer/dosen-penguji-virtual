@@ -2,9 +2,7 @@ import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
-from operator import itemgetter
-from config.prompts import EXAMINER_SYSTEM_PROMPT, EVALUATOR_SYSTEM_PROMPT, QUESTION_STAGES
+from config.prompts import DYNAMIC_EXAMINER_PROMPT, EVALUATOR_SYSTEM_PROMPT
 
 class ChatEngine:
     def __init__(self, retriever):
@@ -18,49 +16,51 @@ class ChatEngine:
         formatted = ""
         for msg in messages:
             role = "Mahasiswa" if msg["role"] == "user" else "Penguji"
-            formatted += f"{role}: {msg['content']}\n\n"
+            # Bersihkan tanda baca [SELESAI] dari history jika ada secara tak terduga
+            clean_content = msg['content'].replace("[SELESAI]", "")
+            formatted += f"{role}: {clean_content}\n\n"
         return formatted
 
-    def generate_question(self, current_stage_index: int, chat_history: list):
-        """Menghasilkan pertanyaan berdasarkan RAG dan stage saat ini."""
-        stage_info = QUESTION_STAGES[current_stage_index]
+    def generate_question(self, chat_history: list):
+        """Menghasilkan pertanyaan secara dinamis berdasarkan RAG dan percakapan terakhir."""
         formatted_history = self.format_chat_history(chat_history)
         
-        prompt = ChatPromptTemplate.from_template(EXAMINER_SYSTEM_PROMPT)
+        prompt = ChatPromptTemplate.from_template(DYNAMIC_EXAMINER_PROMPT)
         
         def format_docs(docs):
             return "\n\n".join(doc.page_content for doc in docs)
 
-        # Buat RAG chain
-        rag_chain = (
-            {
-                "context": itemgetter("fokus_pertanyaan") | self.retriever | format_docs,
-                "nama_penguji": itemgetter("nama_penguji"),
-                "persona": itemgetter("persona"),
-                "tipe_pertanyaan": itemgetter("tipe_pertanyaan"),
-                "fokus_pertanyaan": itemgetter("fokus_pertanyaan"),
-                "chat_history": itemgetter("chat_history")
-            }
-            | prompt
-            | self.llm
-            | StrOutputParser()
-        )
+        # Cari konteks berdasarkan jawaban terakhir mahasiswa
+        # Jika belum ada percakapan (pertanyaan pertama), cari kata kunci umum skripsi
+        search_query = "Latar belakang, rumusan masalah, metodologi penelitian, dan kesimpulan utama"
+        if len(chat_history) > 0:
+            for msg in reversed(chat_history):
+                if msg["role"] == "user":
+                    search_query = msg["content"]
+                    break
+
+        # Tarik dokumen relevan dari ChromaDB
+        docs = self.retriever.invoke(search_query)
+        context_str = format_docs(docs)
         
         # Panggil LLM
-        response = rag_chain.invoke({
-            "nama_penguji": stage_info["nama_penguji"],
-            "persona": stage_info["persona"],
-            "tipe_pertanyaan": stage_info["tipe"],
-            "fokus_pertanyaan": stage_info["fokus"],
+        chain = prompt | self.llm | StrOutputParser()
+        response = chain.invoke({
+            "context": context_str,
             "chat_history": formatted_history
         })
         
         # Bersihkan format blok kode yang tidak disengaja dari AI
         response = response.replace("```markdown", "").replace("```text", "").replace("```", "")
-        # Hapus indentasi berlebihan di awal baris yang menyebabkan markdown menganggapnya sebagai kode
         response = "\n".join(line.lstrip() if line.startswith("    ") or line.startswith("\t") else line for line in response.split("\n"))
         
-        return response
+        # Deteksi apakah AI mengeluarkan bendera SELESAI
+        is_finished = False
+        if "[SELESAI]" in response:
+            is_finished = True
+            response = response.replace("[SELESAI]", "").strip()
+            
+        return response, is_finished
         
     def generate_evaluation(self, chat_history: list):
         """Menghasilkan laporan evaluasi akhir."""

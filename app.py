@@ -3,7 +3,6 @@ import os
 from dotenv import load_dotenv
 from core.rag_engine import RAGEngine
 from core.chat_engine import ChatEngine
-from config.prompts import QUESTION_STAGES
 
 # Load environment variables
 load_dotenv()
@@ -11,13 +10,11 @@ load_dotenv()
 st.set_page_config(page_title="Dosen Penguji Virtual", page_icon="🎓", layout="wide")
 
 st.title("🎓 Dosen Penguji Virtual")
-st.markdown("Unggah PDF Skripsi Anda dan mulai simulasi sidang dengan AI Dosen Penguji.")
+st.markdown("Unggah PDF Skripsi Anda dan mulai simulasi sidang dinamis dengan Panel Dosen Penguji.")
 
 # Inisialisasi state
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "current_stage" not in st.session_state:
-    st.session_state.current_stage = 0
 if "is_finished" not in st.session_state:
     st.session_state.is_finished = False
 if "document_processed" not in st.session_state:
@@ -47,7 +44,6 @@ with st.sidebar:
                         st.session_state.rag_engine = rag
                         st.session_state.document_processed = True
                         st.session_state.messages = [] # Reset chat
-                        st.session_state.current_stage = 0
                         st.session_state.is_finished = False
                         
                         if is_cached:
@@ -62,6 +58,13 @@ with st.sidebar:
         else:
             st.warning("Silakan unggah dokumen PDF atau DOCX terlebih dahulu.")
 
+    # Tombol Akhiri Sesi Paksa
+    if st.session_state.document_processed and not st.session_state.is_finished:
+        st.markdown("---")
+        if st.button("🛑 Akhiri Sidang Paksa"):
+            st.session_state.is_finished = True
+            st.rerun()
+
 # Main area chat
 if st.session_state.document_processed:
     # Init ChatEngine
@@ -73,11 +76,10 @@ if st.session_state.document_processed:
     
     # Generate pertanyaan pertama jika kosong
     if len(st.session_state.messages) == 0 and not st.session_state.is_finished:
-        with st.spinner("AI sedang menyiapkan pertanyaan pertama..."):
+        with st.spinner("Panel Dosen sedang menyiapkan pertanyaan pertama..."):
             try:
-                first_q = chat_engine.generate_question(st.session_state.current_stage, [])
-                nama_penguji = QUESTION_STAGES[st.session_state.current_stage]["nama_penguji"]
-                st.session_state.messages.append({"role": "assistant", "content": f"**[{nama_penguji}]**\n\n{first_q}"})
+                first_q, _ = chat_engine.generate_question([])
+                st.session_state.messages.append({"role": "assistant", "content": f"**[Panel Penguji]**\n\n{first_q}"})
                 st.rerun()
             except Exception as e:
                 st.error(f"Error saat membuat pertanyaan: {str(e)}")
@@ -94,33 +96,40 @@ if st.session_state.document_processed:
             st.session_state.messages.append({"role": "user", "content": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
-
-            # Naikkan stage pertanyaan
-            st.session_state.current_stage += 1
             
             with st.chat_message("assistant"):
-                if st.session_state.current_stage < len(QUESTION_STAGES):
-                    # Lanjut pertanyaan berikutnya
-                    with st.spinner("Menganalisis jawaban dan menyiapkan pertanyaan..."):
-                        try:
-                            next_q = chat_engine.generate_question(st.session_state.current_stage, st.session_state.messages)
-                            nama_penguji = QUESTION_STAGES[st.session_state.current_stage]["nama_penguji"]
-                            st.session_state.messages.append({"role": "assistant", "content": f"**[{nama_penguji}]**\n\n{next_q}"})
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error saat membuat pertanyaan: {str(e)}")
-                else:
-                    # Sudah 4 pertanyaan, masuk ke fase evaluasi
-                    st.session_state.is_finished = True
-                    with st.spinner("Menyusun laporan evaluasi..."):
-                        try:
+                with st.spinner("Dosen menelaah jawaban Anda..."):
+                    try:
+                        next_q, ai_finished = chat_engine.generate_question(st.session_state.messages)
+                        
+                        # Tambahkan ke UI
+                        st.session_state.messages.append({"role": "assistant", "content": f"**[Panel Penguji]**\n\n{next_q}"})
+                        
+                        if ai_finished:
+                            st.session_state.is_finished = True
+                            st.info("Panel Penguji telah menyudahi sesi tanya jawab. Sedang merumuskan evaluasi...")
+                            # Generate Evaluasi seketika
                             eval_report = chat_engine.generate_evaluation(st.session_state.messages)
-                            st.session_state.messages.append({"role": "assistant", "content": f"**[Ketua Sidang / Pembimbing]**\n\n{eval_report}"})
+                            st.session_state.messages.append({"role": "assistant", "content": f"**[Ketua Sidang / Evaluasi Akhir]**\n\n{eval_report}"})
                             st.rerun()
-                        except Exception as e:
-                            st.error(f"Error saat menyusun evaluasi: {str(e)}")
+                        else:
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error saat membuat pertanyaan: {str(e)}")
 
     else:
-        st.info("Simulasi sidang telah selesai. Anda dapat me-refresh halaman atau mengunggah dokumen baru untuk mengulang.")
+        # Jika ditekan paksa (AI belum finish, tapi evaluate belum digenerate)
+        has_eval = any("**[Ketua Sidang / Evaluasi Akhir]**" in m["content"] for m in st.session_state.messages)
+        
+        if not has_eval:
+            with st.spinner("Menyusun laporan evaluasi akhir..."):
+                try:
+                    eval_report = chat_engine.generate_evaluation(st.session_state.messages)
+                    st.session_state.messages.append({"role": "assistant", "content": f"**[Ketua Sidang / Evaluasi Akhir]**\n\n{eval_report}"})
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error saat menyusun evaluasi: {str(e)}")
+                    
+        st.success("Simulasi sidang telah selesai sepenuhnya. Anda dapat me-refresh halaman atau mengunggah dokumen baru untuk mengulang.")
 else:
     st.info("Silakan unggah dokumen PDF atau DOCX di sidebar sebelah kiri dan klik 'Mulai Pemrosesan'.")
