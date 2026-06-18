@@ -23,9 +23,10 @@ class RAGEngine:
         import hashlib
         file_hash = hashlib.md5(file_content).hexdigest()
         db_path = f"./chroma_db/{file_hash}"
+        complete_marker = f"{db_path}/ingestion_complete.txt"
         
-        # Cek jika cache database sudah ada
-        if os.path.exists(db_path):
+        # Cek jika cache database sudah ada DAN prosesnya sudah 100% selesai (mencegah Race Condition multi-user)
+        if os.path.exists(db_path) and os.path.exists(complete_marker):
             print(f"Loading from cache: {db_path}")
             self.vectorstore = Chroma(persist_directory=db_path, embedding_function=self.embeddings)
             return True, True # Beri sinyal is_cached = True
@@ -48,6 +49,10 @@ class RAGEngine:
             # Memecah dokumen dengan chunk_size menengah agar pencarian semantik lebih tajam (akurat)
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=300)
             splits = text_splitter.split_documents(pages)
+            
+            # Mencegah PDF bodong/scanned image lolos tanpa error
+            if len(splits) == 0:
+                raise ValueError("Dokumen ini tidak memiliki teks yang dapat dibaca (kemungkinan berupa PDF hasil scan/gambar). Harap gunakan PDF digital murni atau file DOCX.")
             
             import time
             # Membuat vectorstore dengan persist_directory
@@ -84,6 +89,12 @@ class RAGEngine:
                         else:
                             raise e
                     
+            # Buat penanda bahwa proses telah 100% selesai
+            if not os.path.exists(db_path):
+                os.makedirs(db_path)
+            with open(complete_marker, "w") as f:
+                f.write("done")
+                
             return True, False # is_cached = False
         except Exception as e:
             print(f"Error saat ingest dokumen: {e}")

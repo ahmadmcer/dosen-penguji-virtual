@@ -91,11 +91,15 @@ if st.session_state.document_processed:
 
     # Logika interaksi user
     if not st.session_state.is_finished:
-        if prompt := st.chat_input("Ketik jawaban Anda di sini..."):
-            # Tambahkan jawaban user
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
+        # Cegah "Ghost Input": Jangan tampilkan kolom ketik jika AI gagal memberi pertanyaan pertama
+        is_ready_for_input = len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "assistant"
+        
+        if is_ready_for_input:
+            if prompt := st.chat_input("Ketik jawaban Anda di sini..."):
+                # Tambahkan jawaban user
+                st.session_state.messages.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.markdown(prompt)
             
             with st.chat_message("assistant"):
                 with st.spinner("Dosen menelaah jawaban Anda..."):
